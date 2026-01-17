@@ -35,7 +35,7 @@
 			(CPR_Generator
 				interfaceIpString: "192.168.4.47"
 				interfaceHostOutgoingPort: 5500
-				nanoSecInterval: 100000  //1000 Hz 
+				nanoSecInterval: 10  //1000 Hz 
 				//nanoSecInterval: 1000000 //100 Hz
 				clients: { 
 					//{"127.0.0.1", 5000},

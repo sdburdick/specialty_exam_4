@@ -9,6 +9,7 @@
 #include <vector>
 #include <atomic>
 #include <string>
+#include <deque>
 
 using mixr::base::String;
 using mixr::base::Integer;
@@ -21,6 +22,7 @@ namespace mixr {
         struct Client {
             asio::ip::udp::endpoint endpoint;
             CPR_Packet packet{};
+            //std::deque<std::shared_ptr<CPR_Packet>>packets{};
             bool packetSent{ false };
             std::mutex packet_mutex_;
 
@@ -41,7 +43,7 @@ namespace mixr {
 
 
             void add_client(const udp::endpoint& ep);
-            void tick();
+            void transmit_CPR();
 
 
 
@@ -54,7 +56,6 @@ namespace mixr {
         private:
 
             asio::io_context io_context;
-            float compute_value_for(const Client& c);
 
             void runNetworkThread();
 

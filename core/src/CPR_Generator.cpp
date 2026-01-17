@@ -175,33 +175,25 @@ namespace mixr {
             //todo: wait for reset
 
 
-            SetThreadDescription(GetCurrentThread(), L"CPR_Generator IO Context");
+            SetThreadDescription(GetCurrentThread(), L"CPR_Generator runNetworkThread");
             //we want an asynchronous send - we want to process as many CPR messages as possible
             
 
-            // 100 Hz = 10 millisecond interval
-            
             auto next_tick = std::chrono::steady_clock::now() + nanosecInterval;
 
             while (true) {
-                // 1. Perform your networking work
-                tick();
-
-                // 2. Wait until exactly the next 10ms boundary
-                std::this_thread::sleep_until(next_tick);
-
-                // 3. Increment the goalpost by exactly 10ms
+                
+                transmit_CPR();
+                //need to sleep or we overwhelm the Asio interface
+                std::this_thread::sleep_for(nanosecInterval);
+                //std::this_thread::sleep_until(next_tick);
                 next_tick += nanosecInterval;
             }
             
         }
 
-        float CPR_Generator::compute_value_for(const Client& c) {
-            // Example: client-specific data
-            return static_cast<float>(seq_) * 0.01f;
-        }
 
-        void CPR_Generator::tick() {//initiator
+        void CPR_Generator::transmit_CPR() {//initiator
 
             //precise time for send time, for sensor TDOA calculations
             const uint64_t now_ns = duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
@@ -246,7 +238,6 @@ namespace mixr {
 		void CPR_Generator::updateTC(const double dt) {
             //tick();
 			BaseClass::updateTC(dt);
-            std::cout << "server\n";
             //real time thread - update all the values for the connected sensors:
             int i = 0;
             for (auto& c : myClients) {
