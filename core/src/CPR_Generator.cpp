@@ -16,14 +16,12 @@ namespace mixr {
             "interfaceIpString",  //outgoing IP interface on this computer.  Needs to be able to connect to the net you are transmitting to
             "interfaceHostOutgoingPort", //outgoing port on this computer.  does not match the connected clients, just needs to be free and usable
             "clients",
-            "nanoSecInterval"
             END_SLOTTABLE(CPR_Generator)
 
         BEGIN_SLOT_MAP(CPR_Generator)
             ON_SLOT(1, setSlotInterfaceIpString, mixr::base::String)
             ON_SLOT(2, setSlotInterfaceHostOutgoingPort, mixr::base::Integer)
             ON_SLOT(3, setClients, mixr::base::PairStream)
-            ON_SLOT(4, setNanoSecondMsgInterval, mixr::base::Integer)
             return _ok;
         }
         
@@ -122,20 +120,8 @@ namespace mixr {
             return returnVal;
         }
 
-        bool CPR_Generator::setNanoSecondMsgInterval(const mixr::base::Integer* const sleeptime) {
-            bool returnVal = false;
-            if (sleeptime != nullptr) {
-                nanosecInterval = std::chrono::nanoseconds(sleeptime->asInt());
-                returnVal = true;
-            }
-            return returnVal;
-        }
-
         CPR_Generator::CPR_Generator() : io_context(){
-              
             STANDARD_CONSTRUCTOR()
-            seq_ = 0;
-            
 		}
         void CPR_Generator::copyData(const CPR_Generator& org, const bool cc)
         {
@@ -150,17 +136,13 @@ namespace mixr {
         }
         void CPR_Generator::deleteData() {
             io_context.stop();
-            if (udpThread->joinable()) udpThread->join();
             BaseClass::deleteData();
 
         }
 		void CPR_Generator::reset() {
 			BaseClass::reset();
-            //this would have to be coordinated with the subscriber
-            //add_client(udp::endpoint(asio::ip::make_address("127.0.0.1"), 5001));
             udp_endpoint = std::make_shared<asio::ip::udp::endpoint>(asio::ip::make_address(interface_ip), udp_port);
             socket_ptr = std::make_unique<asio::ip::udp::socket>(io_context, *udp_endpoint);
-            udpThread = std::move(std::make_unique<std::thread>(std::thread(&CPR_Generator::runNetworkThread, this)));
 		}
 
 
@@ -171,99 +153,50 @@ namespace mixr {
             myClients.push_back(std::move(c));
         }
         
-        void CPR_Generator::runNetworkThread() {
-            //todo: wait for reset
+        //async write queues
+        //async accept loops
+        //async read loops
+        //async timers
+        //async state machines
 
+        //Producer thread pushes packets into c->packets (TimeCritical)
+        //Network thread calls send_next(c)
+        //Each async send schedules the next one
+        //Queue drains safely and sequentially
 
-            SetThreadDescription(GetCurrentThread(), L"CPR_Generator runNetworkThread");
-            //we want an asynchronous send - we want to process as many CPR messages as possible
-            
-
-            auto next_tick = std::chrono::steady_clock::now() + nanosecInterval;
-
-            while (true) {
-                
-                transmit_CPR();
-                //need to sleep or we overwhelm the Asio interface
-                std::this_thread::sleep_for(nanosecInterval);
-                //std::this_thread::sleep_until(next_tick);
-                next_tick += nanosecInterval;
-            }
-            
-        }
-
-
-        void CPR_Generator::transmit_CPR() {//initiator
-
+        void CPR_Generator::transmit_CPR_for_client(Client* c) {//initiator
             //precise time for send time, for sensor TDOA calculations
             const uint64_t now_ns = duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
-            for (auto& c : myClients) {//clients_ is a vector of UDP sensors listening for data
-                //todo we need to account for all the packets generated since the last tick (real time thread and tick thread likely different rates)
-                //can avoid sending repeats with packetSent flag, need to handle the case where real time is faster than network
-                
-                //if (c->packetSent == false)
-                //{
-                    std::shared_ptr<CPR_Packet> packet_ptr;
-                    {
-                        std::lock_guard<std::mutex> lock(c->packet_mutex_);
-
-                        if (c->packets.empty()) {
-                            //std::cout << "empty\n";
-                            return;
-                        }
-                        //can't just run through the deque - it needs to happen after the previous message was a success
-                        packet_ptr = c->packets.front();
-                        c->packets.pop_front();//remove it
-                    }
-                    if (packet_ptr != nullptr) {
-                        packet_ptr->seq = seq_;
-                        packet_ptr->timestamp_ns = now_ns;
-
-                        socket_ptr->async_send_to(
-                            asio::buffer(packet_ptr.get(), sizeof(CPR_Packet)),
-                            c->endpoint,
-                            [packet_ptr]//capture the packet_ptr
-                            (std::error_code /*ec*/, std::size_t /*bytes*/) {
-                                //not bothering with the error code.
-                                //not bothering with the number of bytes written.
-                                //this is the completion handler as a lambda.  
-                                //when this lambda finishes, packet_ptr is freed
-
-                                //send next packet after completion:
-
-                            }
-                        );
-                    }
-                //}
-                    
-
-
-                    //using a shared pointer so the object stays in scope for asio async
-                    //and CRFS can keep updating the world - after the copy
-//                    std::shared_ptr<CPR_Packet> packet_ptr;
-//                    {
-//                        std::scoped_lock lock(c->packet_mutex_);//RAII - unlocks when out of scope
-//                        packet_ptr = std::make_shared<CPR_Packet>(c->packet);
-//                        c->packetSent = true;
-//                    }//scoped for mutex
-
-//                    packet_ptr->seq = seq_;
-//                    packet_ptr->timestamp_ns = now_ns;
-
-//                    socket_ptr->async_send_to(
-//                        asio::buffer(packet_ptr.get(), sizeof(CPR_Packet)),
-//                        c->endpoint,
-//                        [](std::error_code /*ec*/, std::size_t /*bytes*/) {
-                            //not bothering with the error code.
-                            //not bothering with the number of bytes written.
-                            //this is the completion handler as a lambda.  
-//                            //when this lambda finishes, packet_ptr is freed
-//                        }
-//                    );
-                    
-                //}
+            std::shared_ptr<CPR_Packet> packet_ptr;
+            {
+                std::lock_guard<std::mutex> lock(c->packet_mutex_);//RAII
+                if (c->packets.empty()) {
+                        //std::cout << "empty\n";
+                    return;
+                }
+                //can't just run through the deque - it needs to happen after the previous message was a success
+                packet_ptr = c->packets.front();
+                c->packets.pop_front();//remove it
             }
-            //++seq_;
+            //we have ownership of the packet, if it exists
+            if (packet_ptr != nullptr) {
+                packet_ptr->timestamp_ns = now_ns;
+                socket_ptr->async_send_to(
+                    asio::buffer(packet_ptr.get(), sizeof(CPR_Packet)),
+                    c->endpoint,
+                    [this, c, packet_ptr]//capture 'this' to call next transmit //capture c for "send next packet after completion" //capture the packet_ptr for scope
+                    (std::error_code /*ec*/, std::size_t /*bytes*/) {
+                        //not bothering with the error code.
+                        //not bothering with the number of bytes written.
+                        //this is the completion handler as a lambda.  
+                        //when this lambda finishes, packet_ptr is freed
+
+                        //send next packet after completion:
+                        transmit_CPR_for_client(c);
+                            
+                    }//packet_ptr descopes from the lambda
+                );
+            }//packet_ptr descopes from the send thread
         }
 
 		void CPR_Generator::updateData(const double dt) {
@@ -272,34 +205,28 @@ namespace mixr {
 		}
 
 		void CPR_Generator::updateTC(const double dt) {
-            //tick();
 			BaseClass::updateTC(dt);
+            
             //real time thread - update all the values for the connected sensors:
-            int i = 0;
+            int i = 0;//just counts off which client it is
             for (auto& c : myClients) {
-                //std::scoped_lock lock(c->packet_mutex_);;
-                //c->packet.freqStart = i++;//temp allows me to identify who is getting this packet
-                //c->packet.freqEnd = c->packet.freqEnd + 1;
-                //c->packetSent = false;
-                //calculate all the values
-
-
-                //deque test:
                 auto pkt = std::make_shared<CPR_Packet>();
-                pkt->freqStart = i++;
-                pkt->freqEnd = c->tempval++;
+                
+                //just filling in a little unique data to show effectiveness and track missing packets
+                pkt->seq = ++(c->messageCount);
 
                 {//RAII - unlocks when out of scope
                     std::lock_guard<std::mutex> lock(c->packet_mutex_);
                     c->packets.push_back(std::move(pkt));
                 }
+                
                 //purely arbitrary warning
                 if (c->packets.size() > 1000) {
                     std::cout << "Warning, CPR Generator packets queued grown to " << c->packets.size() << std::endl;
                 }
 
+                transmit_CPR_for_client(c.get());//initiator
             }
-
 		}
 	}
 }

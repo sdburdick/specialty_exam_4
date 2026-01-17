@@ -20,13 +20,13 @@ using asio::ip::udp;
 namespace mixr {
 	namespace crfs {
         struct Client {
+
             asio::ip::udp::endpoint endpoint;
-            CPR_Packet packet{};
             std::deque<std::shared_ptr<CPR_Packet>>packets{};
             bool packetSent{ false };
             std::mutex packet_mutex_;
 
-            int tempval{ 0 };
+            long messageCount{ 0 };
 
             Client() = default;
             Client(const Client&) = delete;
@@ -38,43 +38,25 @@ namespace mixr {
 
         public:
             CPR_Generator();
-
             void updateTC(const double dt) override;
             void updateData(const double dt)override;
             void reset() override;
-
-
             void add_client(const udp::endpoint& ep);
-            void transmit_CPR();
-
-
+            void transmit_CPR_for_client(Client* c);
 
         protected:
             bool setSlotInterfaceIpString(const mixr::base::String* const name);
             bool setSlotInterfaceHostOutgoingPort(const mixr::base::Integer* const port);
             bool setClients(const mixr::base::PairStream* const inputfile_clients);
-            bool setNanoSecondMsgInterval(const mixr::base::Integer* const sleeptime);
 
         private:
 
             asio::io_context io_context;
-
-            void runNetworkThread();
-
-            std::unique_ptr <std::thread> udpThread;
-
             std::shared_ptr<asio::ip::udp::endpoint> udp_endpoint;
-
             std::string interface_ip = "127.0.0.1";
-            //std::string interface_ip = "192.168.4.47"; 
-            unsigned short udp_port = 5100;
-
-            std::chrono::nanoseconds nanosecInterval{ 1'000'000 }; //1,000,000 translates to 1,000 Hz.  10 mil would be 100 Hz
+            unsigned short udp_port{ 0 };
             std::unique_ptr <udp::socket> socket_ptr;
             std::vector<std::unique_ptr<Client>> myClients;
-            uint32_t seq_;
-
-            
 		};
 	}
 }

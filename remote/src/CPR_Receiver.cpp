@@ -113,10 +113,10 @@ namespace mixr {
 
                             if (len == sizeof(CPR_Packet)) {
                                 message_count++;
-                                if (temp_received_val_checker != incoming_packet.freqEnd - 1) {
-                                    std::cout << "incoming packet: " << incoming_packet.freqStart << " " << incoming_packet.freqEnd << std::endl;
+                                if (temp_received_val_checker != incoming_packet.seq - 1) {
+                                    std::cout << "Missed incoming packet before: " << incoming_packet.freqStart << " " << incoming_packet.freqEnd << std::endl;
                                 }
-                                temp_received_val_checker = incoming_packet.freqEnd;
+                                temp_received_val_checker = incoming_packet.seq;
                                 //  std::cout << "Received Seq: " << incoming_packet.seq
                                   //    << " | TS: " << incoming_packet.timestamp_ns
                                     //  << " | Val: " << incoming_packet.value << std::endl;
