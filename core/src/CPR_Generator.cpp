@@ -9,24 +9,24 @@
 
 namespace mixr {
     namespace crfs {
-        IMPLEMENT_SUBCLASS(CPR_Generator, "CPR_Generator") 
- 
-        //EMPTY_SERIALIZER(CPR_Generator)
-        BEGIN_SLOTTABLE(CPR_Generator)
+        IMPLEMENT_SUBCLASS(CPR_Generator, "CPR_Generator")
+
+            //EMPTY_SERIALIZER(CPR_Generator)
+            BEGIN_SLOTTABLE(CPR_Generator)
             "interfaceIpString",  //outgoing IP interface on this computer.  Needs to be able to connect to the net you are transmitting to
             "interfaceHostOutgoingPort", //outgoing port on this computer.  does not match the connected clients, just needs to be free and usable
             "clients",
             "nanoSecInterval"
-        END_SLOTTABLE(CPR_Generator)
+            END_SLOTTABLE(CPR_Generator)
 
         BEGIN_SLOT_MAP(CPR_Generator)
             ON_SLOT(1, setSlotInterfaceIpString, mixr::base::String)
             ON_SLOT(2, setSlotInterfaceHostOutgoingPort, mixr::base::Integer)
             ON_SLOT(3, setClients, mixr::base::PairStream)
             ON_SLOT(4, setNanoSecondMsgInterval, mixr::base::Integer)
-
-        END_SLOT_MAP()
-
+            return _ok;
+        }
+        
         bool CPR_Generator::setSlotInterfaceIpString(const mixr::base::String* const name) {
             bool returnVal = false;
             if (name != nullptr) {
@@ -51,7 +51,7 @@ namespace mixr {
                 return returnVal;
             }
 
-            clients_.clear();
+            myClients.clear();
 
             const mixr::base::IList::Item* clientList = (inputfile_clients->getFirstItem());
             while (clientList != nullptr) {
@@ -166,9 +166,9 @@ namespace mixr {
 
         //this function needs to be tied to entities subscribing.
         void CPR_Generator::add_client(const udp::endpoint& ep) {
-            Client c{};
-            c.endpoint = ep;
-            clients_.push_back(c);
+            auto c = std::make_unique<Client>();
+            c->endpoint = ep;
+            myClients.push_back(std::move(c));
         }
         
         void CPR_Generator::runNetworkThread() {
@@ -201,39 +201,39 @@ namespace mixr {
             return static_cast<float>(seq_) * 0.01f;
         }
 
-        void CPR_Generator::tick() {
+        void CPR_Generator::tick() {//initiator
 
-            //timer for the rate of messages we want to send out:
-            const uint64_t now_ns =
-                duration_cast<std::chrono::nanoseconds>(
-                    std::chrono::steady_clock::now().time_since_epoch()
-                ).count();
-            
-            for (auto& c : clients_) {
-
-                c.packet.seq = seq_;
-                c.packet.timestamp_ns = now_ns;
-                c.packet.freqbinByTimeslicePower[3][4] = compute_value_for(c);
-
-
-                //blasting out a warning if our packet exceed OS packet size
-                asio::socket_base::send_buffer_size option;
-                socket_ptr->get_option(option);
-
-                size_t system_max_send = option.value();
-
-                if (sizeof(CPR_Packet) > system_max_send) {
-                    std::cerr << "Packet exceeds OS send buffer size." << std::endl;
-                }
-
+            //precise time for send time, for sensor TDOA calculations
+            const uint64_t now_ns = duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
+            for (auto& c : myClients) {//clients_ is a vector of UDP sensors listening for data
+                //todo we need to account for all the packets generated since the last tick (real time thread and tick thread likely different rates)
+                //can avoid sending repeats with packetSent flag, need to handle the case where real time is faster than network
                 
-                socket_ptr->async_send_to(
-                    asio::buffer(&c.packet, sizeof(CPR_Packet)),
-                    c.endpoint,
-                    [](std::error_code /*ec*/, std::size_t /*bytes*/) {
-                        // Intentionally ignore errors for real-time data
-                    }
-                );
+                if (c->packetSent == false)
+                {
+                    //using a shared pointer so the object stays in scope for asio async
+                    //and CRFS can keep updating the world - after the copy
+                    std::shared_ptr<CPR_Packet> packet_ptr;
+                    {
+                        std::scoped_lock lock(c->packet_mutex_);;//RAII - unlocks when out of scope
+                        packet_ptr = std::make_shared<CPR_Packet>(c->packet);
+                        c->packetSent = true;
+                    }//scoped for mutex
+
+                    packet_ptr->seq = seq_;
+                    packet_ptr->timestamp_ns = now_ns;
+
+                    socket_ptr->async_send_to(
+                        asio::buffer(packet_ptr.get(), sizeof(CPR_Packet)),
+                        c->endpoint,
+                        [](std::error_code /*ec*/, std::size_t /*bytes*/) {
+                            //not bothering with the error code.
+                            //not bothering with the number of bytes written.
+                            //this is the completion handler as a lambda.  
+                            //when this lambda finishes, packet_ptr is freed
+                        }
+                    );
+                }
             }
             ++seq_;
         }
@@ -246,6 +246,17 @@ namespace mixr {
 		void CPR_Generator::updateTC(const double dt) {
             //tick();
 			BaseClass::updateTC(dt);
+            std::cout << "server\n";
+            //real time thread - update all the values for the connected sensors:
+            int i = 0;
+            for (auto& c : myClients) {
+                std::scoped_lock lock(c->packet_mutex_);;//RAII - unlocks when out of scope
+                c->packet.freqStart = i++;//temp allows me to identify who is getting this packet
+                c->packet.freqEnd = c->packet.freqEnd + 1;
+                c->packetSent = false;
+                //calculate all the values
+            }
+
 		}
 	}
 }

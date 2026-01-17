@@ -32,6 +32,7 @@ namespace mixr {
 		private:
 			bool initialized{};
 
+            long temp_received_val_checker{ 0 };//just for a test
             
             asio::io_context io_context;
             //must use unique pointer because Mixr factory instantiates,

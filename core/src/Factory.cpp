@@ -4,6 +4,7 @@
 
 #include "core/CrfsSimulation.h"
 #include "core/CPR_Generator.h"
+#include "core/CPR_Generator_Proactor.h"
 #include "core/EmissionManager.h"
 #include "core/EmitterSettingsManager.h"
 #include "core/NetPacketGenerator.h"
@@ -23,6 +24,7 @@ namespace mixr {
 
             if (name == CrfsSimulation::getFactoryName()) { obj = new CrfsSimulation(); }
             if (name == CPR_Generator::getFactoryName()) { obj = new CPR_Generator(); }
+            if (name == CPR_Generator_Proactor::getFactoryName()) { obj = new CPR_Generator_Proactor(); }
 			if (name == EmissionManager::getFactoryName() )   { obj = new EmissionManager(); }
 			if (name == EmitterSettingsManager::getFactoryName()) { obj = new EmitterSettingsManager(); }
 			if (name == NetPacketGenerator::getFactoryName()) { obj = new NetPacketGenerator(); }

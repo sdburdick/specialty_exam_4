@@ -20,7 +20,13 @@ namespace mixr {
 	namespace crfs {
         struct Client {
             asio::ip::udp::endpoint endpoint;
-            CPR_Packet packet;
+            CPR_Packet packet{};
+            bool packetSent{ false };
+            std::mutex packet_mutex_;
+
+            Client() = default;
+            Client(const Client&) = delete;
+            Client& operator=(const Client&) = delete;
         };
 
         class CPR_Generator final : public mixr::base::IComponent {
@@ -62,7 +68,7 @@ namespace mixr {
 
             std::chrono::nanoseconds nanosecInterval{ 1'000'000 }; //1,000,000 translates to 1,000 Hz.  10 mil would be 100 Hz
             std::unique_ptr <udp::socket> socket_ptr;
-            std::vector<Client> clients_;
+            std::vector<std::unique_ptr<Client>> myClients;
             uint32_t seq_;
 
             

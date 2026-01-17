@@ -1,3 +1,5 @@
+#pragma once
+
 #include <cstdint>
 const unsigned short FREQ_BINS = 50;
 const unsigned short TIMESLICES = 14;

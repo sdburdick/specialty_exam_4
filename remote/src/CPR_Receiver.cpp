@@ -113,7 +113,10 @@ namespace mixr {
 
                             if (len == sizeof(CPR_Packet)) {
                                 message_count++;
-                                //std::cout << "incoming packet: " << incoming_packet.freqbinByTimeslicePower[3][4] << std::endl;
+                                if (temp_received_val_checker != incoming_packet.freqEnd - 1) {
+                                    std::cout << "incoming packet: " << incoming_packet.freqStart << " " << incoming_packet.freqEnd << std::endl;
+                                }
+                                temp_received_val_checker = incoming_packet.freqEnd;
                                 //  std::cout << "Received Seq: " << incoming_packet.seq
                                   //    << " | TS: " << incoming_packet.timestamp_ns
                                     //  << " | Val: " << incoming_packet.value << std::endl;
@@ -126,7 +129,7 @@ namespace mixr {
                             std::cerr << "Error: " << e.what() << std::endl;
                         }
                     }
-                    });//closes thread running lambda
+                });//closes thread running lambda
             }
             
                 
@@ -142,7 +145,7 @@ namespace mixr {
 
 
 		void CPR_Receiver::updateTC(const double dt) {
-			
+            //Warning! this is a component of a player, so it gets called 4 times per timestep, which each phase.
 			BaseClass::updateTC(dt);
 		}
 	}
