@@ -1,0 +1,61 @@
+(Station
+   //"simulation",         //  1: Simulation executive
+   //"networks",           //  2: List of Network models
+   //"igHosts",            //  3: Image Generator (IG) visual system host interface(s)
+   //"ioHandler",          //  4: Input/Output (IO) data handler
+   //"ownship",            //  5: Player name of our ownship (primary) player
+   //"tcRate",             //  6: Time-critical rate (Hz) (base::Number, default: 50hz)
+   //"tcPriority",         //  7: Time-critical thread priority (zero(0) is lowest, one(1) is highest)
+   //"tcStackSize",        //  8: Time-critical thread stack size (default: <system default size>)
+   //"fastForwardRate",    //  9: Fast forward rate (i.e., number of times updateTC() is called per frame)
+   //"netRate",            // 10: Network thread rate (Hz)  (base::Number, default: 20 hz)
+   //"netPriority",        // 11: Network thread priority (zero(0) is lowest, one(1) is highest)
+   //"netStackSize",       // 12: Network thread stack size (default: <system default size>)
+   //"bgRate",             // 13: Background thread rate (Hz) (default: 0.0 -- no thread)
+   //"bgPriority",         // 14: Background thread priority
+   //"bgStackSize",        // 15: Background thread stack size (default: <system default size>)
+   //"startupResetTimer",  // 16: Startup (initial) RESET event timer value (base::Time) (default: no reset event)
+   //"enableUpdateTimers", // 17: Enable calling base::Timers::updateTimers() from updateTC() (default: false)
+   //"dataRecorder",       // 18) Our Data Recorder
+	tcRate: 10000
+	bgRate: 20 //Hz
+    simulation: (CrfsSimulation
+		players: { 
+			remote1: (RemotePlayer
+				components: {
+					(CPR_Receiver
+						interfaceIpString: "192.168.4.47"
+						interfaceListenPort: 5001
+					)
+				}
+			)
+		}
+		components: {
+		//note, you can break this up into multiple objects - run two generators (testing required)
+			(CPR_Generator
+				interfaceIpString: "192.168.4.47"
+				interfaceHostOutgoingPort: 5500
+				//nanoSecInterval: 100000  //1000 Hz 
+				nanoSecInterval: 1000000 //100 Hz
+				clients: { 
+					//{"127.0.0.1", 5000},
+					//{"127.0.0.2", 5001},
+					//{"10.0.0.5",  6000},
+					{"192.168.4.47", 5001},
+					{"192.168.4.50", 5001}, //old pc
+					{"192.168.4.49", 5001},
+					//{"127.0.0.1", 5002}
+				}
+			)
+			/*(CPR_Receiver
+				interfaceIpString: "127.0.0.1"
+				interfaceListenPort: 5002
+			)*/
+
+			
+		}
+	)
+	components: {
+		mySdlVisual: (SdlVisual)
+	}
+)

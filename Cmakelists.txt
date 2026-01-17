@@ -1,0 +1,210 @@
+cmake_minimum_required(VERSION 3.20)  
+project(CRFS)
+
+# Set C++20 Standard
+set(CMAKE_CXX_STANDARD 23)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+
+##---External Packages---##
+find_package(OpenGL REQUIRED)
+find_package(SDL2 REQUIRED)
+
+# Set output directories
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/")
+
+##---Source and Headers---##
+# Use GLOB to collect files - 
+file(GLOB CRFS_CORE_SOURCES "${CMAKE_SOURCE_DIR}/core/src/*.cpp")
+file(GLOB CRFS_REMOTE_SOURCES "${CMAKE_SOURCE_DIR}/remote/src/*.cpp")
+file(GLOB CRFS_GUI_SOURCES "${CMAKE_SOURCE_DIR}/gui/src/*.cpp")
+
+
+
+file(GLOB_RECURSE REMOTE_HEADERS  "${CMAKE_SOURCE_DIR}/remote/include/*.h")
+
+file(GLOB_RECURSE CORE_HEADERS    "${CMAKE_SOURCE_DIR}/core/include/*.h")
+
+file(GLOB_RECURSE COMMON_HEADERS    "${CMAKE_SOURCE_DIR}/common/include/*.h")
+
+file(GLOB_RECURSE CRFS_GUI_HEADERS    "${CMAKE_SOURCE_DIR}/gui/include/*.h")
+                               
+
+
+file(GLOB_RECURSE PROJECT_HEADERS "${CMAKE_SOURCE_DIR}/../mixr/include/*.h"
+                                  "${CMAKE_SOURCE_DIR}/../shared/include/*.h"
+                                  "${CMAKE_SOURCE_DIR}/core/include/*.h"
+                                  "${CMAKE_SOURCE_DIR}/remote/include/*.h"
+                                  "${CMAKE_SOURCE_DIR}/gui/include/*.h")
+
+#newlibraryaction -- modify here if adding a library
+
+
+##---Main Exe---##
+add_executable(CRFS "app/main.cpp")
+
+##---Libraries---##
+add_library(core STATIC ${CRFS_CORE_SOURCES} ${CORE_HEADERS})
+add_library(remote STATIC ${CRFS_REMOTE_SOURCES} ${REMOTE_HEADERS})
+#newlibraryaction -- modify here if adding a library
+add_library(gui STATIC ${CRFS_GUI_SOURCES} ${CRFS_GUI_HEADERS})
+
+##---Include dir---##
+target_include_directories(core PRIVATE 
+	"${CMAKE_SOURCE_DIR}/core/include" 
+	"${CMAKE_SOURCE_DIR}/remote/include"
+	"${CMAKE_SOURCE_DIR}/common/include"
+	"${CMAKE_SOURCE_DIR}/gui/include"
+	#example if you need to access shared libraries within the 'core' library
+	"${CMAKE_SOURCE_DIR}/../shared/include"
+	"${CMAKE_SOURCE_DIR}/../mixr/include"
+)
+target_include_directories(remote PRIVATE 
+	"${CMAKE_SOURCE_DIR}/core/include" 
+	"${CMAKE_SOURCE_DIR}/remote/include" 
+	"${CMAKE_SOURCE_DIR}/common/include"
+	#example if you need to access shared libraries within the 'core' library
+	"${CMAKE_SOURCE_DIR}/../shared/include"
+	"${CMAKE_SOURCE_DIR}/../mixr/include"
+)
+
+#newlibraryaction -- modify here if adding a library
+target_include_directories(gui PRIVATE
+    "${CMAKE_SOURCE_DIR}/gui/include"
+    "${CMAKE_SOURCE_DIR}/remote/include" 
+    "${CMAKE_SOURCE_DIR}/core/include"
+    "${CMAKE_SOURCE_DIR}/common/include" 
+    "${CMAKE_SOURCE_DIR}/../shared/include"
+    "${CMAKE_SOURCE_DIR}/../mixr/include"
+    "${CMAKE_SOURCE_DIR}/../shared/SDL2-2.30.10/include"
+)
+
+
+##---Include directories---##
+target_include_directories(CRFS PRIVATE
+    "${CMAKE_SOURCE_DIR}/../mixr/include"
+    "${CMAKE_SOURCE_DIR}/../shared/include"
+    "${CMAKE_SOURCE_DIR}/../shared/SDL2-2.30.10/include"
+    "${CMAKE_SOURCE_DIR}/core/include"
+    "${CMAKE_SOURCE_DIR}/remote/include"
+    "${CMAKE_SOURCE_DIR}/common/include"
+    "${CMAKE_SOURCE_DIR}/gui/include"
+    #newlibraryaction -- modify here if adding a library
+)
+# Organize headers in VS Solution Explorer
+source_group("Header Files" FILES ${PROJECT_HEADERS})
+
+##---Link directories---##
+target_link_directories(CRFS PRIVATE
+    "${CMAKE_SOURCE_DIR}/../mixr/lib"
+    "${CMAKE_SOURCE_DIR}/../shared/SDL2-2.30.10/lib"
+)
+
+##--- Linking and MSVC Flags---##
+if(MSVC)
+	##---Match default MIXR debug levels---##
+	#library debug level 
+	target_compile_definitions(core PUBLIC $<$<CONFIG:Debug>:_ITERATOR_DEBUG_LEVEL=2>)
+	target_compile_definitions(remote PUBLIC $<$<CONFIG:Debug>:_ITERATOR_DEBUG_LEVEL=2>)
+	#newlibraryaction -- modify here if adding a library
+	target_compile_definitions(gui PUBLIC $<$<CONFIG:Debug>:_ITERATOR_DEBUG_LEVEL=2>)
+	#project debug level 
+	target_compile_definitions(CRFS PRIVATE $<$<CONFIG:Debug>:_ITERATOR_DEBUG_LEVEL=2>)
+
+    target_compile_options(CRFS PRIVATE $<$<CONFIG:Debug>:/Zi /Od /RTC1>)
+    target_link_options(CRFS PRIVATE $<$<CONFIG:Debug>:/DEBUG>)
+   	
+	#newlibraryaction -- modify here if adding a library
+    set_property(TARGET core PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+    set_property(TARGET remote PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+    set_property(TARGET gui PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+    set_property(TARGET CRFS PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+	
+	##---Visual Studio debugger settings---##
+	set_property(TARGET CRFS PROPERTY VS_DEBUGGER_WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}")
+	##---Optional - default to no-autoprecompile---##
+	#set_property(TARGET CRFS PROPERTY VS_DEBUGGER_COMMAND_ARGUMENTS "-f settings/crfs.mixr")
+	
+endif()
+
+# Link libraries depending on configuration
+target_link_libraries(CRFS PRIVATE
+	#newlibraryaction -- modify here if adding a library
+    gui
+    core
+    remote
+    winmm.lib
+    Ws2_32.lib
+    OpenGL::GL 
+    OpenGL::GLU 
+    $<$<CONFIG:Debug>:
+        mixr_base_d.lib
+        mixr_dafif_d.lib
+        mixr_graphics_d.lib
+        mixr_graphics_ftgl_d.lib
+        mixr_ighost_cigi_d.lib
+        mixr_ighost_flightgear_d.lib
+        mixr_ighost_pov_d.lib
+        mixr_instruments_d.lib
+        mixr_interop_d.lib
+        mixr_interop_dis_d.lib
+        mixr_interop_hla_d.lib
+        mixr_interop_hla_rprfom_d.lib
+        mixr_linkage_d.lib
+        mixr_map_rpf_d.lib
+        mixr_map_vpf_d.lib
+        mixr_models_d.lib
+        mixr_models_jsbsim_d.lib
+        mixr_recorder_protobuf_v2_d.lib
+        mixr_simulation_d.lib
+        mixr_terrain_d.lib
+        mixr_ui_glut_d.lib
+	SDL2d.lib
+    >
+    $<$<CONFIG:Release>:
+        mixr_base.lib
+        mixr_dafif.lib
+        mixr_graphics.lib
+        mixr_graphics_ftgl.lib
+        mixr_ighost_cigi.lib
+        mixr_ighost_flightgear.lib
+        mixr_ighost_pov.lib
+        mixr_instruments.lib
+        mixr_interop.lib
+        mixr_interop_dis.lib
+        mixr_interop_hla.lib
+        mixr_interop_hla_rprfom.lib
+        mixr_linkage.lib
+        mixr_map_rpf.lib
+        mixr_map_vpf.lib
+        mixr_models.lib
+        mixr_models_jsbsim.lib
+        mixr_recorder_protobuf_v2.lib
+        mixr_simulation.lib
+        mixr_terrain.lib
+        mixr_ui_glut.lib
+	SDL2.lib
+    >
+)
+
+# Include external projects
+include_external_msproject(mixr-base 
+    "${CMAKE_SOURCE_DIR}/../mixr/build/vs2022/projects/base/base.vcxproj"
+    TYPE library
+)
+include_external_msproject(mixr-graphics 
+    "${CMAKE_SOURCE_DIR}/../mixr/build/vs2022/projects/graphics/graphics.vcxproj"
+    TYPE library
+)
+include_external_msproject(mixr-simulation 
+    "${CMAKE_SOURCE_DIR}/../mixr/build/vs2022/projects/simulation/simulation.vcxproj"
+    TYPE library
+)
+source_group("Common Headers" FILES ${COMMON_HEADERS})
+#target_sources(CRFS PRIVATE ${COMMON_HEADERS})
+target_include_directories(CRFS PRIVATE ${CMAKE_SOURCE_DIR}/common)
+
+
+##---Startup Project Setting---##
+	set_property(DIRECTORY ${CMAKE_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT CRFS)
+	
