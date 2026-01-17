@@ -22,9 +22,11 @@ namespace mixr {
         struct Client {
             asio::ip::udp::endpoint endpoint;
             CPR_Packet packet{};
-            //std::deque<std::shared_ptr<CPR_Packet>>packets{};
+            std::deque<std::shared_ptr<CPR_Packet>>packets{};
             bool packetSent{ false };
             std::mutex packet_mutex_;
+
+            int tempval{ 0 };
 
             Client() = default;
             Client(const Client&) = delete;

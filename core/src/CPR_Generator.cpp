@@ -201,33 +201,69 @@ namespace mixr {
                 //todo we need to account for all the packets generated since the last tick (real time thread and tick thread likely different rates)
                 //can avoid sending repeats with packetSent flag, need to handle the case where real time is faster than network
                 
-                if (c->packetSent == false)
-                {
-                    //using a shared pointer so the object stays in scope for asio async
-                    //and CRFS can keep updating the world - after the copy
+                //if (c->packetSent == false)
+                //{
                     std::shared_ptr<CPR_Packet> packet_ptr;
                     {
-                        std::scoped_lock lock(c->packet_mutex_);;//RAII - unlocks when out of scope
-                        packet_ptr = std::make_shared<CPR_Packet>(c->packet);
-                        c->packetSent = true;
-                    }//scoped for mutex
+                        std::lock_guard<std::mutex> lock(c->packet_mutex_);
 
-                    packet_ptr->seq = seq_;
-                    packet_ptr->timestamp_ns = now_ns;
+                        if (c->packets.empty()) {
+                            //std::cout << "empty\n";
+                            return;
+                        }
+                        //can't just run through the deque - it needs to happen after the previous message was a success
+                        packet_ptr = c->packets.front();
+                        c->packets.pop_front();//remove it
+                    }
+                    if (packet_ptr != nullptr) {
+                        packet_ptr->seq = seq_;
+                        packet_ptr->timestamp_ns = now_ns;
 
-                    socket_ptr->async_send_to(
-                        asio::buffer(packet_ptr.get(), sizeof(CPR_Packet)),
-                        c->endpoint,
-                        [](std::error_code /*ec*/, std::size_t /*bytes*/) {
+                        socket_ptr->async_send_to(
+                            asio::buffer(packet_ptr.get(), sizeof(CPR_Packet)),
+                            c->endpoint,
+                            [packet_ptr]//capture the packet_ptr
+                            (std::error_code /*ec*/, std::size_t /*bytes*/) {
+                                //not bothering with the error code.
+                                //not bothering with the number of bytes written.
+                                //this is the completion handler as a lambda.  
+                                //when this lambda finishes, packet_ptr is freed
+
+                                //send next packet after completion:
+
+                            }
+                        );
+                    }
+                //}
+                    
+
+
+                    //using a shared pointer so the object stays in scope for asio async
+                    //and CRFS can keep updating the world - after the copy
+//                    std::shared_ptr<CPR_Packet> packet_ptr;
+//                    {
+//                        std::scoped_lock lock(c->packet_mutex_);//RAII - unlocks when out of scope
+//                        packet_ptr = std::make_shared<CPR_Packet>(c->packet);
+//                        c->packetSent = true;
+//                    }//scoped for mutex
+
+//                    packet_ptr->seq = seq_;
+//                    packet_ptr->timestamp_ns = now_ns;
+
+//                    socket_ptr->async_send_to(
+//                        asio::buffer(packet_ptr.get(), sizeof(CPR_Packet)),
+//                        c->endpoint,
+//                        [](std::error_code /*ec*/, std::size_t /*bytes*/) {
                             //not bothering with the error code.
                             //not bothering with the number of bytes written.
                             //this is the completion handler as a lambda.  
-                            //when this lambda finishes, packet_ptr is freed
-                        }
-                    );
-                }
+//                            //when this lambda finishes, packet_ptr is freed
+//                        }
+//                    );
+                    
+                //}
             }
-            ++seq_;
+            //++seq_;
         }
 
 		void CPR_Generator::updateData(const double dt) {
@@ -241,11 +277,27 @@ namespace mixr {
             //real time thread - update all the values for the connected sensors:
             int i = 0;
             for (auto& c : myClients) {
-                std::scoped_lock lock(c->packet_mutex_);;//RAII - unlocks when out of scope
-                c->packet.freqStart = i++;//temp allows me to identify who is getting this packet
-                c->packet.freqEnd = c->packet.freqEnd + 1;
-                c->packetSent = false;
+                //std::scoped_lock lock(c->packet_mutex_);;
+                //c->packet.freqStart = i++;//temp allows me to identify who is getting this packet
+                //c->packet.freqEnd = c->packet.freqEnd + 1;
+                //c->packetSent = false;
                 //calculate all the values
+
+
+                //deque test:
+                auto pkt = std::make_shared<CPR_Packet>();
+                pkt->freqStart = i++;
+                pkt->freqEnd = c->tempval++;
+
+                {//RAII - unlocks when out of scope
+                    std::lock_guard<std::mutex> lock(c->packet_mutex_);
+                    c->packets.push_back(std::move(pkt));
+                }
+                //purely arbitrary warning
+                if (c->packets.size() > 1000) {
+                    std::cout << "Warning, CPR Generator packets queued grown to " << c->packets.size() << std::endl;
+                }
+
             }
 
 		}
