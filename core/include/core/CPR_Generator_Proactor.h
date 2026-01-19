@@ -18,7 +18,7 @@ using asio::ip::udp;
 
 namespace mixr {
 	namespace crfs {
-        struct Client {
+        struct ProactorClient {
             asio::ip::udp::endpoint endpoint;
             CPR_Packet packet;
         };
@@ -48,7 +48,7 @@ namespace mixr {
         private:
 
             asio::io_context io_context;
-            float compute_value_for(const Client& c);
+            float compute_value_for(const ProactorClient& c);
 
             void runNetworkThread();
 
@@ -62,7 +62,7 @@ namespace mixr {
 
             std::chrono::nanoseconds nanosecInterval{ 1'000'000 }; //1,000,000 translates to 1,000 Hz.  10 mil would be 100 Hz
             std::unique_ptr <udp::socket> socket_ptr;
-            std::vector<Client> clients_;
+            std::vector<ProactorClient> Proactorclients_;
             uint32_t seq_;
 
             

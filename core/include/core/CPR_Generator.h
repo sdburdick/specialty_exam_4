@@ -25,7 +25,7 @@ namespace mixr {
             std::deque<std::shared_ptr<CPR_Packet>>packets{};
             bool packetSent{ false };
             std::mutex packet_mutex_;
-
+            bool sending{ false };
             long messageCount{ 0 };
 
             Client() = default;
@@ -48,10 +48,16 @@ namespace mixr {
             bool setSlotInterfaceIpString(const mixr::base::String* const name);
             bool setSlotInterfaceHostOutgoingPort(const mixr::base::Integer* const port);
             bool setClients(const mixr::base::PairStream* const inputfile_clients);
-
+            
         private:
 
+            void runNetworkThread();
+            
+            std::unique_ptr <std::thread> udpThread;
             asio::io_context io_context;
+
+            std::optional<asio::executor_work_guard<asio::io_context::executor_type>> asio_work_guard; //we are using the MixR reset() call to initialize all this, so make it optional in case a mid run reset needs to happen
+            
             std::shared_ptr<asio::ip::udp::endpoint> udp_endpoint;
             std::string interface_ip = "127.0.0.1";
             unsigned short udp_port{ 0 };

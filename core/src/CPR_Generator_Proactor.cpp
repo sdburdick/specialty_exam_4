@@ -51,7 +51,7 @@ namespace mixr {
                 return returnVal;
             }
 
-            clients_.clear();
+            Proactorclients_.clear();
 
             const mixr::base::IList::Item* clientList = (inputfile_clients->getFirstItem());
             while (clientList != nullptr) {
@@ -137,7 +137,7 @@ namespace mixr {
             seq_ = 0;
             
 		}
-        void CPR_Generator_Proactor::copyData(const CPR_Generator& org, const bool cc)
+        void CPR_Generator_Proactor::copyData(const CPR_Generator_Proactor& org, const bool cc)
         {
             BaseClass::copyData(org, cc);
             if (cc) {
@@ -160,15 +160,15 @@ namespace mixr {
             //add_client(udp::endpoint(asio::ip::make_address("127.0.0.1"), 5001));
             udp_endpoint = std::make_shared<asio::ip::udp::endpoint>(asio::ip::make_address(interface_ip), udp_port);
             socket_ptr = std::make_unique<asio::ip::udp::socket>(io_context, *udp_endpoint);
-            udpThread = std::move(std::make_unique<std::thread>(std::thread(&CPR_Generator::runNetworkThread, this)));
+            udpThread = std::move(std::make_unique<std::thread>(std::thread(&CPR_Generator_Proactor::runNetworkThread, this)));
 		}
 
 
         //this function needs to be tied to entities subscribing.
         void CPR_Generator_Proactor::add_client(const udp::endpoint& ep) {
-            Client c{};
+            ProactorClient c{};
             c.endpoint = ep;
-            clients_.push_back(c);
+            Proactorclients_.push_back(c);
         }
         
         void CPR_Generator_Proactor::runNetworkThread() {
@@ -196,7 +196,7 @@ namespace mixr {
             
         }
 
-        float CPR_Generator_Proactor::compute_value_for(const Client& c) {
+        float CPR_Generator_Proactor::compute_value_for(const ProactorClient& c) {
             // Example: client-specific data
             return static_cast<float>(seq_) * 0.01f;
         }
@@ -209,7 +209,7 @@ namespace mixr {
                     std::chrono::steady_clock::now().time_since_epoch()
                 ).count();
             
-            for (auto& c : clients_) {
+            for (auto& c : Proactorclients_) {
 
                 c.packet.seq = seq_;
                 c.packet.timestamp_ns = now_ns;

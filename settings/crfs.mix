@@ -17,7 +17,7 @@
    //"startupResetTimer",  // 16: Startup (initial) RESET event timer value (base::Time) (default: no reset event)
    //"enableUpdateTimers", // 17: Enable calling base::Timers::updateTimers() from updateTC() (default: false)
    //"dataRecorder",       // 18) Our Data Recorder
-	tcRate: 10000
+	tcRate: 1000
 	bgRate: 20 //Hz
     simulation: (CrfsSimulation
 		players: { 
@@ -41,6 +41,21 @@
 					//{"10.0.0.5",  6000},
 					{"192.168.4.47", 5001},
 					{"192.168.4.50", 5001}, //old pc
+					{"192.168.4.50", 5002}, //old pc
+					{"192.168.4.50", 5003}, //old pc
+					{"192.168.4.50", 5004}, //old pc
+					{"192.168.4.50", 5005}, //old pc
+					{"192.168.4.50", 5006}, //old pc
+					{"192.168.4.50", 5007}, //old pc
+					{"192.168.4.50", 5008}, //old pc
+					{"192.168.4.50", 5011}, //old pc
+					{"192.168.4.50", 5012}, //old pc
+					{"192.168.4.50", 5013}, //old pc
+					{"192.168.4.50", 5014}, //old pc
+					{"192.168.4.50", 5015}, //old pc
+					{"192.168.4.50", 5016}, //old pc
+					{"192.168.4.50", 5017}, //old pc
+					{"192.168.4.50", 5018}, //old pc
 					{"192.168.4.49", 5001},
 					{"192.168.7.11", 5001},//old laptop
 					//{"192.168.7.12", 5001},//doesnt exist
@@ -56,12 +71,6 @@
 					//{"127.0.0.1", 5002}
 				}
 			)
-			/*(CPR_Receiver
-				interfaceIpString: "127.0.0.1"
-				interfaceListenPort: 5002
-			)*/
-
-			
 		}
 	)
 	components: {

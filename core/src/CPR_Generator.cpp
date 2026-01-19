@@ -122,6 +122,7 @@ namespace mixr {
 
         CPR_Generator::CPR_Generator() : io_context(){
             STANDARD_CONSTRUCTOR()
+                
 		}
         void CPR_Generator::copyData(const CPR_Generator& org, const bool cc)
         {
@@ -135,14 +136,31 @@ namespace mixr {
             // this->myVariable = org.myVariable;
         }
         void CPR_Generator::deleteData() {
+            //cleanup asio threading
+            asio_work_guard.reset();
             io_context.stop();
+            if (udpThread->joinable()) {
+                udpThread->join();
+            }
+            if (socket_ptr) {
+                std::error_code ec;
+                socket_ptr->close(ec);
+                socket_ptr.reset();
+            }
             BaseClass::deleteData();
 
         }
 		void CPR_Generator::reset() {
 			BaseClass::reset();
+            asio_work_guard.reset();
+            if (!io_context.stopped()) io_context.stop();
+            if (udpThread && udpThread->joinable()) udpThread->join();
+            io_context.restart();
+            asio_work_guard.emplace(asio::make_work_guard(io_context));
+
             udp_endpoint = std::make_shared<asio::ip::udp::endpoint>(asio::ip::make_address(interface_ip), udp_port);
             socket_ptr = std::make_unique<asio::ip::udp::socket>(io_context, *udp_endpoint);
+            udpThread = std::make_unique<std::thread>(std::thread(&CPR_Generator::runNetworkThread, this));
 		}
 
 
@@ -166,38 +184,52 @@ namespace mixr {
 
         void CPR_Generator::transmit_CPR_for_client(Client* c) {//initiator
             //precise time for send time, for sensor TDOA calculations
-            const uint64_t now_ns = duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
             std::shared_ptr<CPR_Packet> packet_ptr;
             {
                 std::lock_guard<std::mutex> lock(c->packet_mutex_);//RAII
-                if (c->packets.empty()) {
-                        //std::cout << "empty\n";
+                if (c->sending || c->packets.empty()) {
                     return;
                 }
+                c->sending = true;
                 //can't just run through the deque - it needs to happen after the previous message was a success
+
+
                 packet_ptr = c->packets.front();
                 c->packets.pop_front();//remove it
             }
             //we have ownership of the packet, if it exists
             if (packet_ptr != nullptr) {
-                packet_ptr->timestamp_ns = now_ns;
+                packet_ptr->timestamp_ns = duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();;
                 socket_ptr->async_send_to(
                     asio::buffer(packet_ptr.get(), sizeof(CPR_Packet)),
                     c->endpoint,
-                    [this, c, packet_ptr]//capture 'this' to call next transmit //capture c for "send next packet after completion" //capture the packet_ptr for scope
+                   /*lambda to be called when completed*/ [this, c, packet_ptr]//capture 'this' to call next transmit //capture c for "send next packet after completion" //capture the packet_ptr for scope
                     (std::error_code /*ec*/, std::size_t /*bytes*/) {
                         //not bothering with the error code.
                         //not bothering with the number of bytes written.
                         //this is the completion handler as a lambda.  
                         //when this lambda finishes, packet_ptr is freed
-
                         //send next packet after completion:
+                        {  
+                            std::lock_guard<std::mutex> lock(c->packet_mutex_);
+                            c->sending = false;
+                        }
                         transmit_CPR_for_client(c);
                             
                     }//packet_ptr descopes from the lambda
                 );
             }//packet_ptr descopes from the send thread
         }
+
+        void CPR_Generator::runNetworkThread()
+        {
+#ifdef _WIN32
+            SetThreadDescription(GetCurrentThread(), L"CPR_Generator runNetworkThread");
+#endif
+            // Run ASIO event loop
+            io_context.run();
+        }
+
 
 		void CPR_Generator::updateData(const double dt) {
 			// Update internal state
@@ -215,9 +247,16 @@ namespace mixr {
                 //just filling in a little unique data to show effectiveness and track missing packets
                 pkt->seq = ++(c->messageCount);
 
+                bool startAsio = false;
                 {//RAII - unlocks when out of scope
                     std::lock_guard<std::mutex> lock(c->packet_mutex_);
+
+                    if (!c->sending && c->packets.empty()) {
+                        startAsio = true;
+                    }
+
                     c->packets.push_back(std::move(pkt));
+                    
                 }
                 
                 //purely arbitrary warning
@@ -225,7 +264,13 @@ namespace mixr {
                     std::cout << "Warning, CPR Generator packets queued grown to " << c->packets.size() << std::endl;
                 }
 
-                transmit_CPR_for_client(c.get());//initiator
+                if (startAsio) {
+                    // Wake the network thread 
+                    asio::post(io_context, [this, client = c.get()] {
+                        transmit_CPR_for_client(client);//initiator
+                        });
+                }
+                //transmit_CPR_for_client(c.get());//initiator
             }
 		}
 	}
