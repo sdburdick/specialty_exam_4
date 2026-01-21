@@ -9,6 +9,7 @@
 #include <vector>
 #include <atomic>
 #include <string>
+#include <deque>
 
 using mixr::base::String;
 using mixr::base::Integer;
@@ -17,10 +18,19 @@ using mixr::base::PairStream;
 using asio::ip::udp;
 
 namespace mixr {
-	namespace crfs {
+    namespace crfs {
         struct ProactorClient {
+
             asio::ip::udp::endpoint endpoint;
-            CPR_Packet packet;
+            std::deque<std::shared_ptr<CPR_Packet>>packets{};
+            bool packetSent{ false };
+            std::mutex packet_mutex_;
+
+            long messageCount{ 0 };
+
+            ProactorClient() = default;
+            ProactorClient(const ProactorClient&) = delete;
+            ProactorClient& operator=(const ProactorClient&) = delete;
         };
 
         class CPR_Generator_Proactor final : public mixr::base::IComponent {
@@ -28,44 +38,28 @@ namespace mixr {
 
         public:
             CPR_Generator_Proactor();
-
             void updateTC(const double dt) override;
             void updateData(const double dt)override;
             void reset() override;
-
-
             void add_client(const udp::endpoint& ep);
-            void tick();
-
-
+            void transmit_CPR_for_client(ProactorClient* c);
 
         protected:
             bool setSlotInterfaceIpString(const mixr::base::String* const name);
             bool setSlotInterfaceHostOutgoingPort(const mixr::base::Integer* const port);
             bool setClients(const mixr::base::PairStream* const inputfile_clients);
-            bool setNanoSecondMsgInterval(const mixr::base::Integer* const sleeptime);
 
         private:
-
-            asio::io_context io_context;
-            float compute_value_for(const ProactorClient& c);
-
             void runNetworkThread();
 
             std::unique_ptr <std::thread> udpThread;
 
+            asio::io_context io_context;
             std::shared_ptr<asio::ip::udp::endpoint> udp_endpoint;
-
             std::string interface_ip = "127.0.0.1";
-            //std::string interface_ip = "192.168.4.47"; 
-            unsigned short udp_port = 5100;
-
-            std::chrono::nanoseconds nanosecInterval{ 1'000'000 }; //1,000,000 translates to 1,000 Hz.  10 mil would be 100 Hz
+            unsigned short udp_port{ 0 };
             std::unique_ptr <udp::socket> socket_ptr;
-            std::vector<ProactorClient> Proactorclients_;
-            uint32_t seq_;
-
-            
-		};
-	}
+            std::vector<std::unique_ptr<ProactorClient>> myClients;
+        };
+    }
 }

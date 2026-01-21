@@ -17,7 +17,7 @@
    //"startupResetTimer",  // 16: Startup (initial) RESET event timer value (base::Time) (default: no reset event)
    //"enableUpdateTimers", // 17: Enable calling base::Timers::updateTimers() from updateTC() (default: false)
    //"dataRecorder",       // 18) Our Data Recorder
-	tcRate: 1000
+	tcRate: 10000
 	bgRate: 20 //Hz
     simulation: (CrfsSimulation
 		players: { 
@@ -31,8 +31,9 @@
 			)
 		}
 		components: {
+
 		//note, you can break this up into multiple objects - run two generators (testing required)
-			(CPR_Generator
+			(CPR_Generator_Proactor
 				interfaceIpString: "192.168.4.47"
 				interfaceHostOutgoingPort: 5500
 				clients: { 
@@ -58,12 +59,12 @@
 					{"192.168.4.50", 5018}, //old pc
 					{"192.168.4.49", 5001},
 					{"192.168.7.11", 5001},//old laptop
-					//{"192.168.7.12", 5001},//doesnt exist
-					//{"192.168.7.13", 5001},//doesnt exist
-					//{"192.168.7.14", 5001},//doesnt exist
-					//{"192.168.7.15", 5001},//doesnt exist
-					//{"192.168.7.16", 5001},//doesnt exist
-					//{"192.168.7.17", 5001},//doesnt exist
+					{"192.168.7.12", 5001},//doesnt exist
+					{"192.168.7.13", 5001},//doesnt exist
+					{"192.168.7.14", 5001},//doesnt exist
+					{"192.168.7.15", 5001},//doesnt exist
+					{"192.168.7.16", 5001},//doesnt exist
+					{"192.168.7.17", 5001},//doesnt exist
 					//{"192.168.7.18", 5001},//doesnt exist
 					//{"192.168.7.19", 5001},//doesnt exist
 					//{"192.168.7.20", 5001},//doesnt exist

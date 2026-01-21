@@ -1,12 +1,11 @@
 #pragma once
 
 #include <cstdint>
-const unsigned short FREQ_BINS = 50;
-const unsigned short TIMESLICES = 14;
+const unsigned short FREQ_BINS = 725;
+const unsigned short TIMESLICES = 1;
 
 //these width and length of the bins is hard coded now, but will need to be pseudo dynamic.  I will probably
 //need to have XbyY defined for multiple kinds here based on the settings of the receiver...
-
 
 //what i think is important here is knowing that 
 //the antenna doesnt know about az/el/etc of the transmission - you would have to lower your apeture, which would
@@ -18,8 +17,8 @@ struct CPR_Packet {
     uint64_t timestamp_ns;
     float freqStart;
     float freqEnd;
-    float timeStart;
-    float timeEnd;
+    //float timeStart;
+   // float timeEnd;
     //float    value;
     //values from old
     //float frequency;        // GHz
@@ -39,7 +38,8 @@ struct CPR_Packet {
     //float originRoll;
     //end old values
     //what i actually want is the hash of freqs and time blocks they fit in, with power values in the blocks
-    unsigned short freqbinByTimeslicePower[FREQ_BINS][TIMESLICES];
+    unsigned short freqbinByTimeslicePower[FREQ_BINS][TIMESLICES]; //16 bits for now.  If i go to 8 bit, it's 0-255.  
+    //uint8_t freqbinByTimeslicePower[FREQ_BINS][TIMESLICES]; 
 };
 #pragma pack(pop)
 

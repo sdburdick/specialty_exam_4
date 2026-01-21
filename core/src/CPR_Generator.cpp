@@ -270,7 +270,6 @@ namespace mixr {
                         transmit_CPR_for_client(client);//initiator
                         });
                 }
-                //transmit_CPR_for_client(c.get());//initiator
             }
 		}
 	}
