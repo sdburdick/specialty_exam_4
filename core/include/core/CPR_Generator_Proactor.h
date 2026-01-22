@@ -20,17 +20,23 @@ using asio::ip::udp;
 namespace mixr {
     namespace crfs {
         struct ProactorClient {
+            bool netThreadRunningHere{ false };
 
             asio::ip::udp::endpoint endpoint;
             std::deque<std::shared_ptr<CPR_Packet>>packets{};
-            bool packetSent{ false };
-            std::mutex packet_mutex_;
+            std::mutex packet_mutex_;  
 
             long messageCount{ 0 };
 
             ProactorClient() = default;
             ProactorClient(const ProactorClient&) = delete;
             ProactorClient& operator=(const ProactorClient&) = delete;
+            ProactorClient(ProactorClient&&) noexcept = default;
+            ProactorClient& operator=(ProactorClient&&) noexcept = default;
+            ~ProactorClient() {
+                std::lock_guard<std::mutex> lock(packet_mutex_);
+                packets.clear();
+            }
         };
 
         class CPR_Generator_Proactor final : public mixr::base::IComponent {
@@ -42,7 +48,7 @@ namespace mixr {
             void updateData(const double dt)override;
             void reset() override;
             void add_client(const udp::endpoint& ep);
-            void transmit_CPR_for_client(ProactorClient* c);
+            void transmit_CPR_for_client(ProactorClient* c, bool isNetThread);
 
         protected:
             bool setSlotInterfaceIpString(const mixr::base::String* const name);
@@ -53,7 +59,7 @@ namespace mixr {
             void runNetworkThread();
 
             std::unique_ptr <std::thread> udpThread;
-
+            std::optional<asio::executor_work_guard<asio::io_context::executor_type>> asio_work_guard; //we are using the MixR reset() call to initialize all this, so make it optional in case a mid run reset needs to happen
             asio::io_context io_context;
             std::shared_ptr<asio::ip::udp::endpoint> udp_endpoint;
             std::string interface_ip = "127.0.0.1";

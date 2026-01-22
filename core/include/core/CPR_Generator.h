@@ -59,9 +59,11 @@ namespace mixr {
             std::optional<asio::executor_work_guard<asio::io_context::executor_type>> asio_work_guard; //we are using the MixR reset() call to initialize all this, so make it optional in case a mid run reset needs to happen
             
             std::shared_ptr<asio::ip::udp::endpoint> udp_endpoint;
+            std::shared_ptr<asio::ip::udp::endpoint> udp_endpoint2;
             std::string interface_ip = "127.0.0.1";
             unsigned short udp_port{ 0 };
             std::unique_ptr <udp::socket> socket_ptr;
+            std::unique_ptr <udp::socket> socket_ptr2;
             std::vector<std::unique_ptr<Client>> myClients;
 		};
 	}

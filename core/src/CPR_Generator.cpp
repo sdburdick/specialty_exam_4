@@ -159,7 +159,9 @@ namespace mixr {
             asio_work_guard.emplace(asio::make_work_guard(io_context));
 
             udp_endpoint = std::make_shared<asio::ip::udp::endpoint>(asio::ip::make_address(interface_ip), udp_port);
+            udp_endpoint2 = std::make_shared<asio::ip::udp::endpoint>(asio::ip::make_address(interface_ip), udp_port+1);
             socket_ptr = std::make_unique<asio::ip::udp::socket>(io_context, *udp_endpoint);
+            socket_ptr2 = std::make_unique<asio::ip::udp::socket>(io_context, *udp_endpoint2);
             udpThread = std::make_unique<std::thread>(std::thread(&CPR_Generator::runNetworkThread, this));
 		}
 
@@ -200,24 +202,49 @@ namespace mixr {
             //we have ownership of the packet, if it exists
             if (packet_ptr != nullptr) {
                 packet_ptr->timestamp_ns = duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();;
-                socket_ptr->async_send_to(
-                    asio::buffer(packet_ptr.get(), sizeof(CPR_Packet)),
-                    c->endpoint,
-                   /*lambda to be called when completed*/ [this, c, packet_ptr]//capture 'this' to call next transmit //capture c for "send next packet after completion" //capture the packet_ptr for scope
-                    (std::error_code /*ec*/, std::size_t /*bytes*/) {
-                        //not bothering with the error code.
-                        //not bothering with the number of bytes written.
-                        //this is the completion handler as a lambda.  
-                        //when this lambda finishes, packet_ptr is freed
-                        //send next packet after completion:
-                        {  
-                            std::lock_guard<std::mutex> lock(c->packet_mutex_);
-                            c->sending = false;
-                        }
-                        transmit_CPR_for_client(c);
-                            
-                    }//packet_ptr descopes from the lambda
-                );
+                static bool temp = true;
+                if (temp) {
+                    temp = false;
+                    socket_ptr->async_send_to(
+                        asio::buffer(packet_ptr.get(), sizeof(CPR_Packet)),
+                        c->endpoint,
+                        /*lambda to be called when completed*/ [this, c, packet_ptr]//capture 'this' to call next transmit //capture c for "send next packet after completion" //capture the packet_ptr for scope
+                        (std::error_code /*ec*/, std::size_t /*bytes*/) {
+                            //not bothering with the error code.
+                            //not bothering with the number of bytes written.
+                            //this is the completion handler as a lambda.  
+                            //when this lambda finishes, packet_ptr is freed
+                            //send next packet after completion:
+                            {
+                                std::lock_guard<std::mutex> lock(c->packet_mutex_);
+                                c->sending = false;
+                            }
+                            transmit_CPR_for_client(c);
+
+                        }//packet_ptr descopes from the lambda
+                    );
+                }
+                else {
+                    temp = true;
+                    socket_ptr2->async_send_to(
+                        asio::buffer(packet_ptr.get(), sizeof(CPR_Packet)),
+                        c->endpoint,
+                        /*lambda to be called when completed*/ [this, c, packet_ptr]//capture 'this' to call next transmit //capture c for "send next packet after completion" //capture the packet_ptr for scope
+                        (std::error_code /*ec*/, std::size_t /*bytes*/) {
+                            //not bothering with the error code.
+                            //not bothering with the number of bytes written.
+                            //this is the completion handler as a lambda.  
+                            //when this lambda finishes, packet_ptr is freed
+                            //send next packet after completion:
+                            {
+                                std::lock_guard<std::mutex> lock(c->packet_mutex_);
+                                c->sending = false;
+                            }
+                            transmit_CPR_for_client(c);
+
+                        }//packet_ptr descopes from the lambda
+                    );
+                }
             }//packet_ptr descopes from the send thread
         }
 
@@ -227,6 +254,7 @@ namespace mixr {
             SetThreadDescription(GetCurrentThread(), L"CPR_Generator runNetworkThread");
 #endif
             // Run ASIO event loop
+            io_context.run();
             io_context.run();
         }
 

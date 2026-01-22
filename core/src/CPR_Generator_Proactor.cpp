@@ -143,6 +143,9 @@ namespace mixr {
         BaseClass::reset();
         udp_endpoint = std::make_shared<asio::ip::udp::endpoint>(asio::ip::make_address(interface_ip), udp_port);
         socket_ptr = std::make_unique<asio::ip::udp::socket>(io_context, *udp_endpoint);
+        asio_work_guard.emplace(asio::make_work_guard(io_context));
+        udpThread = std::make_unique<std::thread>(std::thread(&CPR_Generator_Proactor::runNetworkThread, this));
+
     }
 
 
@@ -153,20 +156,12 @@ namespace mixr {
         myClients.push_back(std::move(c));
     }
 
-    //async write queues
-    //async accept loops
-    //async read loops
-    //async timers
-    //async state machines
-
     //Producer thread pushes packets into c->packets (TimeCritical)
     //Network thread calls send_next(c)
     //Each async send schedules the next one
     //Queue drains safely and sequentially
 
-    void CPR_Generator_Proactor::transmit_CPR_for_client(ProactorClient* c) {//initiator
-        //precise time for send time, for sensor TDOA calculations
-        const uint64_t now_ns = duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
+    void CPR_Generator_Proactor::transmit_CPR_for_client(ProactorClient* c, bool isNetThread) {//initiator
         std::shared_ptr<CPR_Packet> packet_ptr;
         {
             std::lock_guard<std::mutex> lock(c->packet_mutex_);//RAII
@@ -174,18 +169,18 @@ namespace mixr {
                 //std::cout << "empty\n";
                 return;
             }
+            if (c->packets.size() > 1 && c->netThreadRunningHere && !isNetThread) {
+                std::cout << "tc thread not going to handle this message\n";
+                return;
+            }
             //can't just run through the deque - it needs to happen after the previous message was a success
             packet_ptr = c->packets.front();
             c->packets.pop_front();//remove it
-            if (c->packets.size() > 0) {
-                //we need to make sure the async chain runs on the asio network thread to keep pushing in order
-                
-            }
         }
         
         //we have ownership of the packet, if it exists
         if (packet_ptr != nullptr) {
-            packet_ptr->timestamp_ns = now_ns;
+            packet_ptr->timestamp_ns = duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();;
             socket_ptr->async_send_to(
                 asio::buffer(packet_ptr.get(), sizeof(CPR_Packet)),
                 c->endpoint,
@@ -197,9 +192,11 @@ namespace mixr {
                     //when this lambda finishes, packet_ptr is freed
 
                     //send next packet after completion:
-                    
-                    transmit_CPR_for_client(c);//note, asio isnt actually running, so this chain never kicks off
-
+                    c->netThreadRunningHere = true;
+                    transmit_CPR_for_client(c, true);
+                    if (c->packets.empty()) {
+                        c->netThreadRunningHere = false;
+                    }
                 }//packet_ptr descopes from the lambda
             );
         }//packet_ptr descopes from the send thread
@@ -211,7 +208,19 @@ namespace mixr {
         SetThreadDescription(GetCurrentThread(), L"CPR_Generator runNetworkThread");
 #endif
         // Run ASIO event loop
+        //if we hammer the number of threads running, we can catch back up
+        //tested: 7 io context, 25 connected computers, 10,000 'spikes' of second message enqueued per TC step.
+        //using best path - TC attempts to enqueue, when it falls behind, the network thread takes over and this engine fires up
+        //running at 5000 hz
+        
+        //this call only happens once, this is not a 'crfs-looping' thread
         io_context.run();
+        io_context.run();
+        io_context.run();
+        io_context.run();
+        io_context.run();
+        io_context.run();
+        
     }
 
     void CPR_Generator_Proactor::updateData(const double dt) {
@@ -223,7 +232,6 @@ namespace mixr {
         BaseClass::updateTC(dt);
 
         //real time thread - update all the values for the connected sensors:
-        int i = 0;//just counts off which client it is
         for (auto& c : myClients) {
             auto pkt = std::make_shared<CPR_Packet>();
 
@@ -235,23 +243,25 @@ namespace mixr {
                 c->packets.push_back(std::move(pkt));
             }
 
+            static int count = 10000;
+            count--;
+            if (count > 0) {
+                auto pkt2 = std::make_shared<CPR_Packet>();
 
-            auto pkt2 = std::make_shared<CPR_Packet>();
+                //just filling in a little unique data to show effectiveness and track missing packets
+                pkt2->seq = ++(c->messageCount);
 
-            //just filling in a little unique data to show effectiveness and track missing packets
-            pkt2->seq = ++(c->messageCount);
-
-            {//RAII - unlocks when out of scope
-                std::lock_guard<std::mutex> lock(c->packet_mutex_);
-                c->packets.push_back(std::move(pkt2));
+                {//RAII - unlocks when out of scope
+                    std::lock_guard<std::mutex> lock(c->packet_mutex_);
+                    c->packets.push_back(std::move(pkt2));
+                }
             }
-
             //purely arbitrary warning
             if (c->packets.size() > 1000) {
                 std::cout << "Warning, CPR Generator packets queued grown to " << c->packets.size() << std::endl;
             }
 
-            transmit_CPR_for_client(c.get());//initiator without context switching
+            transmit_CPR_for_client(c.get(), false);//initiator without context switching
         }
     }
 }
