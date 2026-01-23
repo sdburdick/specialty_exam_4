@@ -40,13 +40,14 @@ namespace mixr {
             void updateData(const double dt)override;
             void reset() override;
             void add_client(const udp::endpoint& ep);
-            void transmit_CPR_for_client(ProactorClient* c, bool isNetThread);
+            void transmit_CPR_for_client(ProactorClient* c);
 
         protected:
             bool setSlotInterfaceIpString(const mixr::base::String* const name);
             bool setSlotInterfaceHostOutgoingPort(const mixr::base::Integer* const port);
             bool setClients(const mixr::base::PairStream* const inputfile_clients);
             bool setNumUdpThreads(const mixr::base::Integer* const num);
+            bool shutdownNotification();
 
         private:
 
