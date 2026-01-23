@@ -17,7 +17,7 @@
    //"startupResetTimer",  // 16: Startup (initial) RESET event timer value (base::Time) (default: no reset event)
    //"enableUpdateTimers", // 17: Enable calling base::Timers::updateTimers() from updateTC() (default: false)
    //"dataRecorder",       // 18) Our Data Recorder
-	tcRate: 1000
+	tcRate: 2000
 	bgRate: 20 //Hz
     simulation: (CrfsSimulation
 		players: { 
@@ -36,7 +36,7 @@
 			(CPR_Generator_Proactor
 				interfaceIpString: "192.168.4.47"
 				interfaceHostOutgoingPort: 5500
-				udpThreads: 4
+				udpThreads: 25
 				clients: { 
 
 					//{"127.0.0.1", 5000},
@@ -59,19 +59,26 @@
 					{"192.168.4.50", 5016}, //old pc
 					{"192.168.4.50", 5017}, //old pc
 					{"192.168.4.50", 5018}, //old pc
-					{"192.168.4.49", 5001},
-					{"192.168.7.11", 5001},//old laptop
-					{"192.168.7.12", 5001},//doesnt exist
-					{"192.168.7.13", 5001},//doesnt exist
-					{"192.168.7.14", 5001},//doesnt exist
-					{"192.168.7.15", 5001},//doesnt exist
-					{"192.168.7.16", 5001},//doesnt exist
-					{"192.168.7.17", 5001},//doesnt exist
-					{"192.168.7.18", 5001},//doesnt exist
-					{"192.168.7.19", 5001},//doesnt exist
-					{"192.168.7.20", 5001},//doesnt exist
-					{"192.168.7.21", 5001},//doesnt exist
-					{"127.0.0.1", 5002}
+					{"192.168.4.50", 5021}, //old pc
+					{"192.168.4.50", 5022}, //old pc
+					{"192.168.4.50", 5023}, //old pc
+					{"192.168.4.50", 5024}, //old pc
+					{"192.168.4.50", 5025}, //old pc
+					{"192.168.4.50", 5026}, //old pc
+					{"192.168.4.50", 5027}, //old pc
+					//{"192.168.4.49", 5001},
+					//{"192.168.7.11", 5001},//old laptop
+					//{"192.168.7.12", 5001},//doesnt exist
+					//{"192.168.7.13", 5001},//doesnt exist
+					//{"192.168.7.14", 5001},//doesnt exist
+					//{"192.168.7.15", 5001},//doesnt exist
+					//{"192.168.7.16", 5001},//doesnt exist
+					//{"192.168.7.17", 5001},//doesnt exist
+					//{"192.168.7.18", 5001},//doesnt exist
+					//{"192.168.7.19", 5001},//doesnt exist
+					//{"192.168.7.20", 5001},//doesnt exist
+					//{"192.168.7.21", 5001},//doesnt exist
+					//{"127.0.0.1", 5002}
 				}
 			)
 		}

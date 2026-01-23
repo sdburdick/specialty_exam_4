@@ -146,25 +146,24 @@ namespace mixr {
         BaseClass::updateTC(dt);
 
         for (auto& c : myClients) {
+            auto pkt = std::make_shared<CPR_Packet>();
+            pkt->seq = ++c->messageCount;
+            
+            // debug warning if queue grows too large
+            const auto now = std::chrono::steady_clock::now();
+            if (c->packets.size() > 1000) {
+                if (now - c->lastQueueWarning >= std::chrono::seconds(1)) {
+                    c->lastQueueWarning = now;
+                    std::cout
+                        << "Warning: CPR Generator packets queued = "
+                        << c->packets.size()
+                        << std::endl;
+                }
+            }
             asio::post(
                 strand,
-                [this, client = c.get()]() {
-                    auto pkt = std::make_shared<CPR_Packet>();
-                    pkt->seq = ++client->messageCount;
+                [this, pkt, client = c.get()]() {
                     client->packets.push_back(pkt);
-
-                    // debug warning if queue grows too large
-                    const auto now = std::chrono::steady_clock::now();
-                    if (client->packets.size() > 1000) {
-                        if (now - client->lastQueueWarning >= std::chrono::seconds(1)) {
-                            client->lastQueueWarning = now;
-                            std::cout
-                                << "Warning: CPR Generator packets queued = "
-                                << client->packets.size()
-                                << std::endl;
-                        }
-                    }
-
                     if (client->packets.size() == 1) {
                         transmit_CPR_for_client(client);
                     }
